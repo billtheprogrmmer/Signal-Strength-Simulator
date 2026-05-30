@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SignalSim • Cellular Signal Simulator</title>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+        
+        :root {
+            --primary: #00ff9d;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0a0a0a;
+            color: #fff;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        header {
+            background: #111;
+            padding: 1rem 2rem;
+            border-bottom: 1px solid #222;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .logo {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+        
+        .controls {
+            background: #111;
+            padding: 1.5rem;
+            width: 320px;
+            border-right: 1px solid #222;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+        
+        .map-container {
+            flex: 1;
+            position: relative;
+        }
+        
+        #map {
+            height: 100%;
+            width: 100%;
+        }
+        
+        .results {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(17, 17, 17, 0.95);
+            border: 1px solid #333;
+            border-radius: 12px;
+            padding: 1.2rem;
+            width: 280px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+        
+        h1 {
+            font-size: 1.1rem;
+            margin-bottom: 1rem;
+            color: #ccc;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+            color: #aaa;
+        }
+        
+        select, input {
+            width: 100%;
+            padding: 10px 12px;
+            background: #1f1f1f;
+            border: 1px solid #333;
+            border-radius: 8px;
+            color: white;
+            font-size: 1rem;
+        }
+        
+        button {
+            background: var(--primary);
+            color: black;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 1rem;
+            transition: all 0.2s;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 255, 157, 0.3);
+        }
+        
+        .signal-bars {
+            display: flex;
+            gap: 6px;
+            margin: 15px 0;
+        }
+        
+        .bar {
+            width: 28px;
+            background: #333;
+            border-radius: 4px;
+            transition: all 0.4s;
+        }
+        
+        .bar.active {
+            background: var(--primary);
+        }
+        
+        .signal-info {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid #333;
+        }
+        
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.6rem;
+            font-size: 0.95rem;
+        }
+        
+        .value {
+            color: var(--primary);
+            font-weight: 600;
+        }
+        
+        .status {
+            margin-top: 1rem;
+            padding: 8px 12px;
+            border-radius: 6px;
+            text-align: center;
+            font-weight: 500;
+        }
+        
+        .legend {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(17, 17, 17, 0.9);
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            border: 1px solid #333;
+        }
+        
+        .tower {
+            background: #ff4444;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 50%;
+            font-size: 0.7rem;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo">SignalSim</div>
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <div id="network-display" style="background: #1f1f1f; padding: 6px 14px; border-radius: 9999px; font-size: 0.9rem;">5G</div>
+            <div id="location-name" style="color: #888; font-size: 0.95rem;">Lagos, Nigeria</div>
+        </div>
+    </header>
+    
+    <div style="display: flex; flex: 1; overflow: hidden;">
+        <!-- Controls -->
+        <div class="controls">
+            <div>
+                <h1>Simulation Controls</h1>
+                
+                <div style="margin-bottom: 1.2rem;">
+                    <label>Cellular Network</label>
+                    <select id="network" onchange="updateSimulation()">
+                        <option value="5G">5G NR</option>
+                        <option value="4G">4G LTE</option>
+                        <option value="3G">3G UMTS</option>
+                        <option value="2G">2G GSM</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label>Environment</label>
+                    <select id="environment" onchange="updateSimulation()">
+                        <option value="urban">Urban (Dense)</option>
+                        <option value="suburban" selected>Suburban</option>
+                        <option value="rural">Rural</option>
+                        <option value="highway">Highway</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div>
+                <label>Current Location</label>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                    <div>
+                        <input type="text" id="lat" value="6.5244" placeholder="Latitude" onchange="updateSimulation()">
+                    </div>
+                    <div>
+                        <input type="text" id="lng" value="3.3792" placeholder="Longitude" onchange="updateSimulation()">
+                    </div>
+                </div>
+                <small style="color: #666; margin-top: 4px; display: block;">Click on map to change location</small>
+            </div>
+            
+            <button onclick="simulateSignal()">SIMULATE SIGNAL</button>
+            
+            <div class="signal-info" id="quick-stats">
+                <div class="metric">
+                    <span>Signal Strength</span>
+                    <span class="value" id="strength-val">-68 dBm</span>
+                </div>
+                <div class="metric">
+                    <span>Quality</span>
+                    <span class="value" id="quality-val">Excellent</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Map -->
+        <div class="map-container">
+            <div id="map"></div>
+            
+            <!-- Results Panel -->
+            <div class="results" id="results-panel">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                    <h2 style="font-size: 1.3rem; color: var(--primary);">Signal Status</h2>
+                    <div id="bars" class="signal-bars">
+                        <div class="bar" style="height: 20px"></div>
+                        <div class="bar" style="height: 32px"></div>
+                        <div class="bar" style="height: 48px"></div>
+                        <div class="bar" style="height: 64px"></div>
+                        <div class="bar" style="height: 80px"></div>
+                    </div>
+                </div>
+                
+                <div class="metric">
+                    <span>Signal (dBm)</span>
+                    <span id="dbm" class="value">-68 dBm</span>
+                </div>
+                <div class="metric">
+                    <span>Network</span>
+                    <span id="net-type" class="value">5G NR</span>
+                </div>
+                <div class="metric">
+                    <span>Estimated Speed</span>
+                    <span id="speed" class="value">420 Mbps</span>
+                </div>
+                <div class="metric">
+                    <span>Latency</span>
+                    <span id="latency" class="value">12 ms</span>
+                </div>
+                
+                <div id="status" class="status" style="background: #003322; color: #00ff9d;">
+                    Excellent Connection
+                </div>
+            </div>
+            
+            <!-- Legend -->
+            <div class="legend">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+                    <div class="tower">📍</div>
+                    <span>Cell Tower</span>
+                </div>
+                <div style="color: #666; font-size: 0.75rem;">Signal fades with distance</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Leaflet Map
+        let map;
+        let currentMarker;
+        let towers = [];
+        
+        // Sample tower locations around Lagos
+        const towerLocations = [
+            { lat: 6.5244, lng: 3.3792, name: "Lagos Island Tower" },
+            { lat: 6.5321, lng: 3.4015, name: "Victoria Island Tower" },
+            { lat: 6.4965, lng: 3.3482, name: "Ikeja Tower" },
+            { lat: 6.5500, lng: 3.3900, name: "Lekki Tower" }
+        ];
+        
+        function initMap() {
+            map = L.map('map').setView([6.5244, 3.3792], 13);
+            
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors',
+                maxZoom: 19,
+            }).addTo(map);
+            
+            // Add towers
+            towerLocations.forEach(tower => {
+                const marker = L.marker([tower.lat, tower.lng], {
+                    icon: L.divIcon({
+                        className: 'tower-marker',
+                        html: `<div class="tower">📍</div>`,
+                        iconSize: [30, 30]
+                    })
+                }).addTo(map)
+                  .bindPopup(`<b>${tower.name}</b><br>Cell Tower`);
+                
+                towers.push(marker);
+            });
+            
+            // Current location marker
+            currentMarker = L.marker([6.5244, 3.3792], {
+                draggable: true
+            }).addTo(map);
+            
+            currentMarker.on('dragend', function(e) {
+                const pos = currentMarker.getLatLng();
+                document.getElementById('lat').value = pos.lat.toFixed(4);
+                document.getElementById('lng').value = pos.lng.toFixed(4);
+                simulateSignal();
+            });
+            
+            // Click on map to move location
+            map.on('click', function(e) {
+                currentMarker.setLatLng(e.latlng);
+                document.getElementById('lat').value = e.latlng.lat.toFixed(4);
+                document.getElementById('lng').value = e.latlng.lng.toFixed(4);
+                simulateSignal();
+            });
+        }
+        
+        // Signal calculation
+        function calculateSignal(lat, lng, network, environment) {
+            // Find closest tower
+            let minDistance = Infinity;
+            
+            towerLocations.forEach(tower => {
+                const distance = getDistance(lat, lng, tower.lat, tower.lng);
+                if (distance < minDistance) minDistance = distance;
+            });
+            
+            // Base signal
+            let baseDbm = -45;
+            
+            // Distance penalty
+            let distanceFactor = minDistance * 18; // dBm loss per km
+            
+            // Environment modifier
+            let envModifier = 0;
+            switch(environment) {
+                case 'urban': envModifier = 12; break;
+                case 'suburban': envModifier = 6; break;
+                case 'rural': envModifier = -8; break;
+                case 'highway': envModifier = 4; break;
+            }
+            
+            // Network capability
+            let networkBonus = 0;
+            switch(network) {
+                case '5G': networkBonus = -8; break;
+                case '4G': networkBonus = -3; break;
+                case '3G': networkBonus = 15; break;
+                case '2G': networkBonus = 25; break;
+            }
+            
+            let signalDbm = Math.round(baseDbm - distanceFactor + envModifier + networkBonus + (Math.random() * 8 - 4));
+            
+            // Clamp values
+            signalDbm = Math.max(-115, Math.min(-45, signalDbm));
+            
+            // Calculate quality
+            let quality = "Poor";
+            let bars = 1;
+            
+            if (signalDbm > -65) {
+                quality = "Excellent";
+                bars = 5;
+            } else if (signalDbm > -75) {
+                quality = "Good";
+                bars = 4;
+            } else if (signalDbm > -85) {
+                quality = "Fair";
+                bars = 3;
+            } else if (signalDbm > -100) {
+                quality = "Weak";
+                bars = 2;
+            }
+            
+            // Estimated speed
+            let speed = "N/A";
+            if (network === "5G") {
+                speed = Math.round(850 - (minDistance * 80)) + " Mbps";
+            } else if (network === "4G") {
+                speed = Math.round(120 - (minDistance * 25)) + " Mbps";
+            } else if (network === "3G") {
+                speed = Math.round(18 - (minDistance * 4)) + " Mbps";
+            } else {
+                speed = "0.8 Mbps";
+            }
+            
+            const latency = network === "5G" ? Math.round(8 + Math.random()*12) : 
+                           network === "4G" ? Math.round(18 + Math.random()*25) : 85;
+            
+            return {
+                dbm: signalDbm,
+                quality: quality,
+                bars: bars,
+                speed: speed,
+                latency: latency + " ms"
+            };
+        }
+        
+        function getDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; // Radius of the earth in km
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = 
+                Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+        
+        function updateBars(bars) {
+            const barElements = document.querySelectorAll('.bar');
+            barElements.forEach((bar, index) => {
+                if (index < bars) {
+                    bar.classList.add('active');
+                } else {
+                    bar.classList.remove('active');
+                }
+            });
+        }
+        
+        function simulateSignal() {
+            const lat = parseFloat(document.getElementById('lat').value) || 6.5244;
+            const lng = parseFloat(document.getElementById('lng').value) || 3.3792;
+            const network = document.getElementById('network').value;
+            const environment = document.getElementById('environment').value;
+            
+            const result = calculateSignal(lat, lng, network, environment);
+            
+            // Update UI
+            document.getElementById('dbm').textContent = result.dbm + " dBm";
+            document.getElementById('net-type').textContent = network;
+            document.getElementById('speed').textContent = result.speed;
+            document.getElementById('latency').textContent = result.latency;
+            
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = result.quality + " Connection";
+            
+            if (result.quality === "Excellent") {
+                statusEl.style.background = "#003322";
+                statusEl.style.color = "#00ff9d";
+            } else if (result.quality === "Good") {
+                statusEl.style.background = "#223300";
+                statusEl.style.color = "#aaff00";
+            } else {
+                statusEl.style.background = "#331100";
+                statusEl.style.color = "#ffaa00";
+            }
+            
+            updateBars(result.bars);
+            
+            // Update header
+            document.getElementById('network-display').textContent = network;
+        }
+        
+        function updateSimulation() {
+            // Auto update on control change
+            simulateSignal();
+        }
+        
+        // Initialize everything
+        window.onload = function() {
+            initMap();
+            simulateSignal();
+            
+            // Demo animation
+            setTimeout(() => {
+                document.getElementById('lng').value = "3.4015";
+                simulateSignal();
+            }, 1800);
+        };
+    </script>
+</body>
+</html>
